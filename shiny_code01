@@ -1,0 +1,88 @@
+library(shiny)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(FactoMineR)
+library(maps)
+library(dplyr)
+library(leaflet)
+library(RColorBrewer)
+library(geokz)
+
+my.path <- "C:/Users/Alina/Desktop/AITU/2 course/Practice-НИЦ/Week1"
+setwd(my.path)
+data <- read.csv2("Data1.csv")
+
+# Define number of colors
+num_colors <- 5
+
+# Define color palette
+pal <- brewer.pal(num_colors, "YlOrRd")
+
+# Generate a vector of colors
+clust_colors2 <- pal[as.factor(data$Cluster)]
+
+all <- data[,3]
+paletteNum <- colorNumeric('YlOrRd', domain = all)
+
+kaz_adm1_sf <- geokz::kaz_adm1_sf
+data$lon=as.numeric(data$lon)
+data$lat=as.numeric(data$lat)
+kazmap <- leaflet(data = data) %>% 
+  addTiles() %>% 
+  addPolygons(data = sf::st_zm(kaz_adm1_sf), color = ~paletteNum(all), opacity = 0.9) %>%
+  addLegend(pal = paletteNum, values = all, opacity = 0.9, title = "Businesses", position = "bottomleft") %>%
+  addPolylines(data = kaz_adm1_sf, color = "black", opacity = 1, weight = 2) %>%
+  addCircleMarkers(~lon, ~lat, popup = as.character(data$Center), 
+                   radius = 5,
+                   color = clust_colors2,
+                   stroke = FALSE,
+                   fillOpacity = 1,
+                   label = ~as.character(Center),
+                   labelOptions = labelOptions(
+                     noHide = T,
+                     direction = 'left',
+                     textOnly = T,
+                     textSize = 10))
+
+# Define UI
+ui <- fluidPage(
+  # Define a title
+  titlePanel("Choropleth Map with Navigator"),
+  
+  # Define a sidebar with a link to GitHub repository
+  sidebarPanel(
+    h3("Navigation"),
+    br(),
+    a("Link to GitHub Repository", href = "https://github.com/alinashrpt/Ch", target="_blank")
+  ),
+  
+  # Define the leaflet map and information panel
+  mainPanel(
+    fluidRow(
+      column(width = 9,
+             leafletOutput("kazmap")
+      ),
+      column(width = 3,
+             h3("Data Information"),
+             br(),
+             p("This map shows the distribution of businesses across Kazakhstan, categorized into 5 clusters based on their location."),
+             br(),
+             p("Each circle marker represents a business, and its color indicates the cluster it belongs to."),
+             br(),
+             p("The legend on the bottom-left corner shows the range of business values corresponding to each color in the map.")
+      )
+    )
+  )
+)
+
+# Define server
+server <- function(input, output) {
+  # Render the leaflet map
+  output$kazmap <- renderLeaflet({
+    kazmap
+  })
+}
+
+# Run the Shiny app
+shinyApp(ui = ui, server = server)
